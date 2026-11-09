@@ -2,6 +2,8 @@
 
 import sys
 from pathlib import Path
+
+import yaml
 from langsmith import Client
 from utils import save_yaml, print_section_header
 
@@ -10,21 +12,38 @@ HANDLE_NAME = "leonanluppi"
 
 OUTPUT_PATH = Path(__file__).resolve().parent.parent / "prompts" / f"{FILE_NAME}.yml"
 
-def pull_prompts_from_langsmith(prompt_id: str) -> dict:
+
+def pull_prompts_from_langsmith(prompt_id: str) -> list:
     client = Client()
     prompt = client.pull_prompt(
         prompt_id,
         dangerously_pull_public_prompt=True,
     )
 
-    data = {"system_prompt": "", "user_prompt": ""}
+    data = []
     for message in prompt.messages:
-        template = message.prompt.template
-        if "system" in message.__class__.__name__.lower():
-            data["system_prompt"] = template
-        else:
-            data["user_prompt"] = template
+        role = message.__class__.__name__.removesuffix("MessagePromptTemplate").lower()
+        data.append({role: message.prompt.template})
+
     return data
+
+
+def build_prompt_file(messages: list) -> dict:
+    """Preenche o template local com os textos vindos do LangSmith."""
+    values = {}
+    for message in messages:
+        values.update(message)
+
+    return {
+        FILE_NAME: {
+            "description": "Prompt para converter relatos de bugs em User Stories",
+            "system_prompt": values["system"],
+            "user_prompt": values["human"],
+            "version": "v1",
+            "created_at": "2025-01-15",
+            "tags": ["bug-analysis", "user-story", "product-management"],
+        }
+    }
 
 
 def main():
@@ -36,7 +55,9 @@ def main():
     print(f"Destino: {OUTPUT_PATH}")
 
     try:
-        data = pull_prompts_from_langsmith(prompt_id)
+        messages = pull_prompts_from_langsmith(prompt_id)
+        data = build_prompt_file(messages)
+       
         save_yaml(data, str(OUTPUT_PATH))
     except Exception as exc:
         print(f"❌ Falha ao baixar o prompt: {exc}")
