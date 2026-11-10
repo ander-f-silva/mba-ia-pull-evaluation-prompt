@@ -173,6 +173,18 @@ def extract_json_from_response(response_text: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _supports_custom_temperature(model_name: str) -> bool:
+    """Modelos de raciocínio só aceitam a temperatura padrão da API."""
+    name = model_name.lower()
+    if name.startswith(("o1", "o3", "o4")):
+        return False
+    if name.startswith("gpt-5") and "chat" not in name:
+        return False
+    if name.startswith("gpt-6"):
+        return False
+    return True
+
+
 def get_llm(model: Optional[str] = None, temperature: float = 0.0):
     """
     Retorna uma instância de LLM configurada baseada no provider.
@@ -209,11 +221,11 @@ def get_llm(model: Optional[str] = None, temperature: float = 0.0):
                 "Obtenha uma chave em: https://platform.openai.com/api-keys"
             )
 
-        return ChatOpenAI(
-            model=model_name,
-            temperature=temperature,
-            api_key=api_key
-        )
+        llm_kwargs = {"model": model_name, "api_key": api_key}
+        if _supports_custom_temperature(model_name):
+            llm_kwargs["temperature"] = temperature
+
+        return ChatOpenAI(**llm_kwargs)
 
     elif provider == 'google':
         from langchain_google_genai import ChatGoogleGenerativeAI
