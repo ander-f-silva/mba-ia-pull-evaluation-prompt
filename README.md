@@ -10,6 +10,69 @@ Você deve entregar um software capaz de:
 - Avaliar a qualidade através de métricas customizadas (Helpfulness, Correctness, F1-Score, Clarity, Precision)
 - Atingir pontuação mínima de 0.8 (80%) em todas as métricas de avaliação
 
+## Passo a passo deste projeto
+
+A avaliação não lê o YAML local. Ela baixa do LangSmith Hub o prompt que foi publicado. Por isso a ordem é: baixar a v1, reescrever a v2, publicar a v2 e só então avaliar.
+
+O que mudou em cada versão, as técnicas usadas e as notas de cada execução estão em [README_tecnicas.md](README_tecnicas.md).
+
+### 1. Preparar o ambiente
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+No `.env`, preencha `LANGSMITH_API_KEY`, `OPENAI_API_KEY` (ou `GOOGLE_API_KEY`), `LLM_PROVIDER`, `LLM_MODEL`, `EVAL_MODEL` e `USERNAME_LANGSMITH_HUB`. O handle do Hub só existe depois de tornar um prompt público (seção "Handle do LangSmith Hub").
+
+### 2. Baixar o prompt v1
+
+O prompt de partida está no Hub como `leonanluppi/bug_to_user_story_v1`. O script grava o conteúdo em `prompts/bug_to_user_story_v1.yml`.
+
+```bash
+python src/pull_prompts.py
+```
+
+### 3. Reescrever o prompt como v2
+
+Edite `prompts/bug_to_user_story_v2.yml` a partir da v1. A versão usada na avaliação aprovada e o histórico das tentativas estão descritos em [README_tecnicas.md](README_tecnicas.md).
+
+### 4. Publicar o prompt v2
+
+O push lê `prompts/bug_to_user_story_v2.yml` e publica `{USERNAME_LANGSMITH_HUB}/bug_to_user_story_v2`. Cada push novo sobrescreve esse mesmo nome no Hub. Confira a URL impressa no terminal e, se o prompt ainda estiver privado, use **Make Public** no LangSmith.
+
+```bash
+python src/push_prompts.py
+```
+
+### 5. Avaliar (o script faz o pull da v2 publicada)
+
+`src/evaluate.py` baixa do Hub o prompt publicado no passo 4, roda os 15 exemplos de `datasets/bug_to_user_story.jsonl` e grava as notas como feedback de um experimento. Se o YAML local mudou e o push não foi refeito, a avaliação continua usando a versão antiga do Hub.
+
+```bash
+python src/evaluate.py
+```
+
+Critério de aprovação: Helpfulness, Correctness, F1-Score, Clarity e Precision, cada uma >= 0.8. O link do experimento aparece no final da saída.
+
+### Resultado das execuções
+
+O detalhe de cada rodada (v2 a v2.5, gpt-5-nano e gpt-5-mini, notas e links dos experimentos) está em [README_tecnicas.md](README_tecnicas.md). A rodada aprovada, com modelo principal e avaliador em gpt-5-mini, ficou com média geral **0.9213** (F1 0.94, Clarity 0.87, Precision 0.95, Helpfulness 0.91, Correctness 0.94).
+
+Os gráficos abaixo são a comparação dos experimentos no LangSmith (feedback, latência, tokens, custo e taxa de erro). As barras `#7` e `#6` correspondem às execuções mais leves; da `#5` à `#1`, latência, tokens de saída e custo sobem juntos, na casa de 30 s (P50) e cerca de US$ 0,025 por experimento. A taxa de erro ficou em zero nas sete execuções.
+
+![Feedback das execuções no LangSmith](anexo/Captura%20de%20Tela%202026-11-10%20%C3%A0s%2023.20.57.png)
+
+![Latência P50 e P99 das execuções](anexo/Captura%20de%20Tela%202026-11-10%20a%CC%80s%2023.21.34.png)
+
+![Tokens de entrada e saída](anexo/Captura%20de%20Tela%202026-11-10%20a%CC%80s%2023.22.17.png)
+
+![Custo de entrada e saída](anexo/Captura%20de%20Tela%202026-11-10%20a%CC%80s%2023.22.31.png)
+
+![Taxa de erro das execuções](anexo/Captura%20de%20Tela%202026-11-10%20a%CC%80s%2023.22.56.png)
+
 ## Exemplo no CLI
 
 Exemplo de prompt RUIM (v1) — apenas ilustrativo, para você entender o ponto de partida:
