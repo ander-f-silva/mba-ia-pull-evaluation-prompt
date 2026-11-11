@@ -224,6 +224,10 @@ def get_llm(model: Optional[str] = None, temperature: float = 0.0):
         llm_kwargs = {"model": model_name, "api_key": api_key}
         if _supports_custom_temperature(model_name):
             llm_kwargs["temperature"] = temperature
+        elif model_name.lower().startswith("gpt-5"):
+            # ChatOpenAI traduz max_tokens para max_completion_tokens na API.
+            llm_kwargs["reasoning_effort"] = "minimal"
+            llm_kwargs["max_tokens"] = 4000
 
         return ChatOpenAI(**llm_kwargs)
 
